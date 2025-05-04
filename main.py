@@ -3,7 +3,8 @@
 # --------------------
 from os import path, listdir
 from re import compile
-from math import log
+from math import log, sqrt
+from os.path import basename
 
 # --------------------
 # CONSTANTS
@@ -73,31 +74,24 @@ def make_std_vector(md_contents):
     std_vector = set()
     for content in md_contents:
         tokens = get_tokens(content)
-        for token in tokens:
-            std_vector.add(token)
+        std_vector.update(tokens)
     return list(std_vector)
-
-
-def make_vector(content, std_vector):
-    tokens = get_tokens(content)
 
 
 def compute_tfidf_weights(md_contents, std_vector):
     N = len(md_contents)
     df_counts = {term: 0 for term in std_vector}
 
-    # Count in how many documents each term appears
     for content in md_contents:
         tokens = set(get_tokens(content))
         for token in tokens:
             if token in df_counts:
                 df_counts[token] += 1
 
-    # Compute IDF for each token
     idf_dict = {}
     for term in std_vector:
         df = df_counts.get(term, 0)
-        idf_dict[term] = log(N / (1 + df))  # Smoothed with 1
+        idf_dict[term] = log(N / (1 + df))  # Smoothed with +1
 
     return idf_dict
 
@@ -106,12 +100,10 @@ def make_tfidf_vector(content, std_vector, idf_dict):
     tokens = get_tokens(content)
     total_terms = len(tokens)
 
-    # Count TF
     tf_counts = {}
     for token in tokens:
         tf_counts[token] = tf_counts.get(token, 0) + 1
 
-    # Build TF-IDF vector
     tfidf_vector = []
     for term in std_vector:
         tf = tf_counts.get(term, 0) / total_terms if total_terms else 0
@@ -123,27 +115,48 @@ def make_tfidf_vector(content, std_vector, idf_dict):
 
 def make_tfidf_vectors_for_all(md_paths, md_contents, std_vector, idf_dict):
     tfidf_dict = {}
-
     for path, content in zip(md_paths, md_contents):
         tfidf_vector = make_tfidf_vector(content, std_vector, idf_dict)
         tfidf_dict[path] = tfidf_vector
-
     return tfidf_dict
 
 
+def cosine_similarity(vec1, vec2):
+    dot = sum(a * b for a, b in zip(vec1, vec2))
+    mag1 = sqrt(sum(a * a for a in vec1))
+    mag2 = sqrt(sum(b * b for b in vec2))
+    return dot / (mag1 * mag2) if mag1 and mag2 else 0.0
+
+
+def build_similarity_matrix(target_folder):
+    md_paths = get_md_paths(target_folder)
+    md_contents = get_md_contents(md_paths)
+    std_vector = make_std_vector(md_contents)
+    idf_dict = compute_tfidf_weights(md_contents, std_vector)
+    tfidf_vectors = make_tfidf_vectors_for_all(md_paths, md_contents, std_vector, idf_dict)
+
+    file_names = [basename(p) for p in md_paths]
+    file_map = {basename(p): tfidf_vectors[p] for p in md_paths}
+
+    similarity_dict = {}
+
+    for file1 in file_names:
+        similarity_dict[file1] = {}
+        for file2 in file_names:
+            if file1 != file2:
+                vec1 = file_map[file1]
+                vec2 = file_map[file2]
+                similarity = cosine_similarity(vec1, vec2)
+                similarity_dict[file1][file2] = round(similarity, 4)
+
+    return similarity_dict
+
+
 # --------------------
-# TESTING
+# MAIN
 # --------------------
 if __name__ == '__main__':
     from pprint import pprint
 
-    md_paths = get_md_paths(TARGET_FOLDER)
-    md_contents = get_md_contents(md_paths)
-    std_vector = make_std_vector(md_contents)
-
-    pprint(md_paths)
-    print("\n\n----------------------------------------------------------------------------\n\n")
-    pprint(md_contents)
-    print("\n\n----------------------------------------------------------------------------\n\n")
-    print(std_vector)
-    print("\n\n----------------------------------------------------------------------------\n\n")
+    result = build_similarity_matrix(TARGET_FOLDER)
+    pprint(result)
