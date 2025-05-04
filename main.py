@@ -151,6 +151,36 @@ def build_similarity_matrix(target_folder):
 
     return similarity_dict
 
+# --------------------
+# DATA VISUALIZATION
+# --------------------
+# this section is entirely from chatgpt
+
+import matplotlib.pyplot as plt
+import seaborn as sns
+import pandas as pd
+
+def display_similarity_heatmap(similarity_dict):
+    # Get a consistent sorted list of filenames
+    filenames = sorted(similarity_dict.keys())
+
+    # Reconstruct the DataFrame using the same order for rows and columns
+    df = pd.DataFrame(
+        [[similarity_dict.get(row, {}).get(col, 0) for col in filenames] for row in filenames],
+        index=filenames,
+        columns=filenames
+    )
+
+    plt.figure(figsize=(10, 8))
+    sns.heatmap(df, annot=True, cmap='coolwarm', fmt=".2f", linewidths=0.5)
+    plt.title("Markdown File Similarity (Cosine TF-IDF)")
+    plt.xticks(rotation=45, ha='right')
+    plt.yticks(rotation=0)
+    plt.tight_layout()
+    plt.show()
+
+
+
 
 # --------------------
 # MAIN
@@ -160,3 +190,4 @@ if __name__ == '__main__':
 
     result = build_similarity_matrix(TARGET_FOLDER)
     pprint(result)
+    display_similarity_heatmap(result)
