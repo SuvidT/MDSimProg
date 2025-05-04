@@ -3,6 +3,7 @@
 # --------------------
 from os import path, listdir
 from re import compile
+from math import log
 
 # --------------------
 # CONSTANTS
@@ -79,7 +80,56 @@ def make_std_vector(md_contents):
 
 def make_vector(content, std_vector):
     tokens = get_tokens(content)
-        
+
+
+def compute_tfidf_weights(md_contents, std_vector):
+    N = len(md_contents)
+    df_counts = {term: 0 for term in std_vector}
+
+    # Count in how many documents each term appears
+    for content in md_contents:
+        tokens = set(get_tokens(content))
+        for token in tokens:
+            if token in df_counts:
+                df_counts[token] += 1
+
+    # Compute IDF for each token
+    idf_dict = {}
+    for term in std_vector:
+        df = df_counts.get(term, 0)
+        idf_dict[term] = log(N / (1 + df))  # Smoothed with 1
+
+    return idf_dict
+
+
+def make_tfidf_vector(content, std_vector, idf_dict):
+    tokens = get_tokens(content)
+    total_terms = len(tokens)
+
+    # Count TF
+    tf_counts = {}
+    for token in tokens:
+        tf_counts[token] = tf_counts.get(token, 0) + 1
+
+    # Build TF-IDF vector
+    tfidf_vector = []
+    for term in std_vector:
+        tf = tf_counts.get(term, 0) / total_terms if total_terms else 0
+        idf = idf_dict.get(term, 0)
+        tfidf_vector.append(tf * idf)
+
+    return tfidf_vector
+
+
+def make_tfidf_vectors_for_all(md_paths, md_contents, std_vector, idf_dict):
+    tfidf_dict = {}
+
+    for path, content in zip(md_paths, md_contents):
+        tfidf_vector = make_tfidf_vector(content, std_vector, idf_dict)
+        tfidf_dict[path] = tfidf_vector
+
+    return tfidf_dict
+
 
 # --------------------
 # TESTING
